@@ -1,0 +1,418 @@
+package fnplot.syntax;
+
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.*;
+import fnplot.sys.SyntaxFnPlotException;
+import fnplot.values.FnPlotValue;
+
+/* Preliminaries to set up and use the scanner.  */
+parser code {:
+		FnPlotLexer lexer;
+
+		public FnPlotParser(FnPlotLexer l) {
+		    // As of CUP v0.11, need to pass Lexer to superclass
+		    super(l);
+		    lexer = l;
+		}
+
+		public void report_error(String message, Object info) {
+		    System.err.println(message);
+		}
+
+		public void syntax_error(Symbol cur_token) {
+		    System.err.print("Line " + lexer.getLine() +
+				     " near char " + lexer.getChar() + ": ");
+		    report_error("Syntax error", cur_token);
+		    System.err.println ("Last token read is " +
+					 lexer.getText());
+		}
+	    :};
+
+init with {:
+	  :};
+
+scan with {:
+		try {
+		    return lexer.next_token();
+		} catch (java.io.IOException ioe) {
+                    String msg = "Line " + lexer.getLine() + ", pos " +
+				       lexer.getColumn() +
+				       ": Unrecognised token <" +
+				       lexer.getText() + ">";
+		    throw new SyntaxFnPlotException(msg, ioe);
+		}
+	  :};
+
+/* Terminals (tokens returned by the scanner). */
+
+// special symbols
+terminal LPAREN, RPAREN;
+
+terminal FUN, MAPS, PLOT, CLEAR; 
+
+// arithmetic operators
+terminal PLUS, SUBTRACT, MUL, DIV, MOD, ASSIGN, POW, MINUS;
+terminal LET, IN, LBRACE, RBRACE, COMMA;
+terminal SEMI;
+terminal COLON;
+terminal LSQR, RSQR;
+
+terminal EMPTY, PAIR, CAR, CDR, QUESTION, LIST, SIZE, EQV, EQUAL, PAIRQ;
+terminal PROC, CALL, DEF, IF, THEN, ELSE, CASE, PRINT, PRINTLN, READ, READINT;
+terminal CONCAT, LVEC, RVEC, SUBSTR, BOOL;
+terminal HEAPIFY, GETMIN, DELETEMIN, INSERT;
+terminal FOR, REPEAT, UNTIL, WHILE, DO, BEGIN, END, TO, RANGE;
+
+
+// terminals with values
+terminal Double INTEGER;
+terminal String VARIABLE;
+terminal String COMPARE;
+terminal String LOGOP;
+terminal String STRING;
+terminal String CHAR;
+terminal String UNI;
+terminal String BIN;
+terminal String HEX;
+terminal String COMPARISON;
+terminal String PARAMETER;
+
+
+/* Non terminals */
+non terminal ArithProgram program;
+non terminal StmtSequence stmtList;
+non terminal Statement stmt;
+non terminal StmtDefinition definition;
+
+non terminal StmtLet letExp;
+non terminal ArrayList<Binding> bindings;
+non terminal ArrayList<Binding> bindingsAux;
+non terminal Binding binding;
+
+non terminal Exp expression;
+non terminal Exp arithExp;
+non terminal Exp term;
+non terminal Exp factor;
+non terminal FnPlotValue<?> number;
+non terminal empty;
+non terminal Exp power;
+
+non terminal ArrayList<String> paramListE;
+non terminal ArrayList<String> paramL;
+non terminal ArrayList<Exp> expListE;
+non terminal ArrayList<Exp> expL;
+//non terminal ArrayList<Exp> procexpL;
+non terminal Exp funDef;
+non terminal Exp funCall;
+non terminal Exp plotExp;
+non terminal Exp clearExp;
+
+non terminal Exp literal;
+non terminal Exp string;
+non terminal Exp character;
+
+non terminal Exp vector;
+non terminal Exp subvector;
+non terminal ArrayList<Exp> vectorExpL;
+non terminal Exp list;
+non terminal Exp pair;
+non terminal Exp indexV;
+non terminal Exp indexP;
+non terminal Exp size;
+non terminal Exp call;
+non terminal Exp concat;
+non terminal Exp boolean;
+non terminal Exp else;
+
+non terminal Exp compare;
+non terminal Exp logops;
+non terminal Exp condition;
+
+non terminal Exp ifElseExp;
+non terminal Exp caseExp;
+non terminal ArrayList<Exp> caseList;
+non terminal ArrayList<Exp> caseListE;
+
+non terminal Exp binaryheap;
+non terminal Exp loop;
+non terminal Exp IOExp;
+
+
+/* Grammar rules */
+
+program ::= stmtList:s {: RESULT = new ArithProgram(s); :};
+
+stmtList ::= stmtList:lst stmt:s {:
+		lst.add(s); 
+		RESULT = lst;
+		:} |
+	     stmt:s {:
+		RESULT = new StmtSequence(s);
+		:};
+
+stmt ::= definition:d {: RESULT = d; :} |
+	 expression:e SEMI {: RESULT = e; :};
+
+
+
+expression ::=  funDef:l {: RESULT = l; :} |
+		plotExp:l {: RESULT = l; :} |
+		clearExp:l {: RESULT = l; :} |
+		letExp:l {: RESULT = l; :} |
+		LBRACE stmtList:body RBRACE {: RESULT = body; :} |
+		BEGIN stmtList:body END {: RESULT = body; :} |
+		concat: v {: RESULT = v; :} |
+		call: v {: RESULT = v; :} |
+		condition: c {: RESULT = c; :}|
+		ifElseExp: c {: RESULT = c; :}|
+		caseExp: c {: RESULT = c; :}|
+		literal: l {: RESULT = l; :}|
+		loop: l {: RESULT = l; :}|
+		IOExp: l {: RESULT = l; :}|
+		arithExp:a {: RESULT = a; :} ;
+
+
+//---------------------------------------------------------------------------------------------------------
+
+literal ::= 	string: s {: RESULT = s; :} 	|
+		pair: p {: RESULT = p; :} 	|
+		vector: v {: RESULT = v; :} 	|
+		list: v {: RESULT = v; :} 	|
+		binaryheap: l {: RESULT = l; :}	|
+ 	   	character: c {: RESULT = c; :}	|
+		indexV: v {: RESULT = v; :} 	|
+		indexP: p {: RESULT = p; :} 	|
+		boolean: b {: RESULT = b; :};
+
+
+binaryheap ::= HEAPIFY LPAREN expression:v RPAREN {: RESULT = new ExpHeap(v, "heapify"); :} | 
+		GETMIN LPAREN expression:e RPAREN {: RESULT = new ExpHeap(e, "getmin"); :} |
+		DELETEMIN LPAREN expression:e RPAREN {: RESULT = new ExpHeap(e, "deletemin"); :} |
+		INSERT LPAREN expression:e COMMA expression:insert RPAREN {: RESULT = new ExpHeap(e, insert, "insert"); :};
+
+
+string ::= STRING: s {: RESULT = new ExpString(s); :} |STRING:s1 PLUS STRING:s2 {: RESULT = new ExpString(s1 + s2); :}| 
+		SUBSTR LPAREN expression:start COMMA expression: stop COMMA expression: string RPAREN {: 
+		RESULT = new ExpSubStr(start, stop, string); :};
+
+
+character ::= CHAR: c {: RESULT = new ExpString( new Character(c.charAt(2)) ); :} |
+		UNI: u {: RESULT = new ExpString( (char)Integer.parseInt(u.substring(2,6)) ); :};
+
+
+boolean ::= BOOL:b {: RESULT = new ExpBool((Boolean) b); :};
+
+
+pair ::=  PAIR LPAREN expression:e1 COMMA expression:e2 RPAREN {: RESULT = new ExpPair(e1, e2); :} | EMPTY {: RESULT = new 			ExpPair(new ExpNull(), new ExpNull()); :};
+
+
+list ::= LIST LPAREN expListE:el RPAREN {: RESULT = new ExpList(el); :} | LSQR expListE:el RSQR {: RESULT = new ExpList(el); :};
+
+
+concat ::= factor:e1 CONCAT expression:e2 {: RESULT = new ExpConcat(e1, e2); :} | list:e1 CONCAT expression:e2 {: RESULT = new 		   ExpConcat(e1, e2); :};
+
+
+vector ::= LVEC vectorExpL:el RVEC {: RESULT = new ExpVector(el); :};
+
+
+vectorExpL ::= vectorExpL:ls COMMA subvector:e {: ls.add(e);
+		  RESULT = ls;
+		:} |
+		subvector:e {: ArrayList <Exp> ls = new ArrayList<>();
+			ls.add(e);
+			RESULT = ls; :};
+
+subvector ::= expression:size COLON expression: e {: RESULT = new ExpSubVector(size, e); :} | expression:e {: RESULT = e; :}|
+
+	expression:val FOR VARIABLE:v IN RANGE LPAREN expression:start COMMA expression:stop RPAREN IF condition:c {:
+	RESULT = new ExpVecComp(v, val, start, stop, c); :} |
+
+	expression:val FOR VARIABLE:v IN RANGE LPAREN expression:start COMMA expression:stop RPAREN {: 
+	RESULT = new ExpVecComp(v, val, start, stop, new ExpBool(new Boolean(true))); :};
+
+
+//----------------------------------------------------------------------------------------------------------------------
+
+ifElseExp ::= IF expression: c THEN expression: body1 ELSE expression: body2 {: RESULT = new ExpIf (c, body1, body2) ; :};
+
+
+caseExp ::= CASE LBRACE caseListE:cl RBRACE {: RESULT = new ExpCase(cl); :};
+
+caseListE ::= caseList:pl {: RESULT = pl; :} ; 
+
+caseList ::= caseList:ls COMMA expression:c COLON expression:body {: ls.add(new ExpIf (c, body, body));
+		  RESULT = ls; :} |
+		expression:c COLON expression:body {: ArrayList <Exp> ls = new ArrayList<>();
+			ls.add(new ExpIf (c, body, body));
+			RESULT = ls; :};
+
+
+indexV ::= vector: v LSQR arithExp:a RSQR {: RESULT = new ExpIndex(v , a); :}| arithExp: v LSQR arithExp:a RSQR {: RESULT = new 		ExpIndex(v , a); :}; 
+
+
+indexP ::= CAR LPAREN expression:p RPAREN {: RESULT = new ExpIndex(p, new ExpLit(FnPlotValue.make(0))); :} | 
+	   CDR LPAREN expression:p RPAREN {: RESULT = new ExpIndex(p, new ExpLit(FnPlotValue.make(1))); :};
+
+
+size ::= SIZE LPAREN expression: v RPAREN  {: RESULT = new ExpSize(v, "size"); :};
+
+
+ 
+condition ::= 	logops: l {: RESULT = l; :}| 
+	      	compare: c {: RESULT = c; :} |
+		else: e {: RESULT = e; :};
+
+
+logops ::= compare:c1 LOGOP:l compare:c2 {: RESULT = new ExpLogOp(c1, c2, l); :} | 
+		LOGOP:l compare:c {: RESULT = new ExpLogOp(c, c, l); :}; 
+
+
+compare ::=  arithExp:a1 COMPARE:c arithExp:a2 {: RESULT = new ExpCompare(a1, a2, c); :} | 
+		EQV LPAREN expression: e1 COMMA expression: e2 RPAREN  {: RESULT = new ExpSize(e1, e2, "eqv"); :} 	|
+		EQUAL LPAREN expression: e1 COMMA expression: e2 RPAREN  {: RESULT = new ExpSize(e1, e2, "equal"); :} 	|
+		PAIRQ LPAREN expression:e RPAREN  {: RESULT = new ExpSize(e, e, "type"); :} 				|
+		
+		literal: e1 COMPARISON:c arithExp: e2  {: RESULT = new ExpSize(e1, e2, c); :} 	|
+		arithExp: e1 COMPARISON:c literal: e2  {: RESULT = new ExpSize(e1, e2, c); :} 	|
+		literal: e1 COMPARISON:c literal: e2  {: RESULT = new ExpSize(e1, e2, c); :} 	|
+ 		arithExp: e1 COMPARISON:c arithExp: e2  {: RESULT = new ExpSize(e1, e2, c); :}	;
+
+
+else ::=  ELSE {: RESULT = new ExpBool(new Boolean(true)); :};
+
+
+IOExp ::= PRINT LPAREN expression:v RPAREN {: RESULT = new ExpReadPrint(v, "print"); :} | 
+		PRINTLN LPAREN expression:e RPAREN {: RESULT = new ExpReadPrint(e, "println"); :} |
+		READ LPAREN    RPAREN {: RESULT = new ExpReadPrint("read"); :} |
+		READINT LPAREN   RPAREN {: RESULT = new ExpReadPrint("readint"); :};
+
+loop ::= 	WHILE expression:c DO expression:e {: RESULT = new ExpLoop(e, c, "while");  :} |
+		FOR binding:b TO expression:e1 DO expression:e2 {: RESULT = new ExpLoop(b, e1, e2, "for"); :} |
+		REPEAT expression:e UNTIL expression:c {: RESULT = new ExpLoop(e, c, "repeat"); :} ;
+
+//----------------------------------------------------------------------------------------------------------
+
+plotExp ::= PLOT expression:body FOR VARIABLE:v IN LSQR factor:low COLON factor:high RSQR  {: 
+					RESULT = new ExpPlot(body, v, low, high);
+					:};
+
+
+clearExp ::= CLEAR {:RESULT = new ExpClear(); :};
+
+//----------------------------------------------------------------------------------------------------------
+
+
+funDef ::= FUN LPAREN paramListE:pl RPAREN MAPS expression:body {: RESULT = new ExpFunction (pl, body) ; :} |
+
+	   PROC LPAREN paramListE:pl RPAREN expression:body {: RESULT = new ExpFunction (pl, body) ; :} ;
+
+
+paramListE ::= paramL:pl {: RESULT = pl; :}    /*| empty {: RESULT = new ArrayList(); :}*/;
+
+
+paramL ::= paramL:ls COMMA VARIABLE:v {: ls.add(v);
+		  RESULT = ls;:} |
+
+		paramL:ls COMMA PARAMETER:p VARIABLE:v {: ls.add(p +" "+ v);
+		  	RESULT = ls; :} |
+
+		VARIABLE:v {: ArrayList <String> ls = new ArrayList<>();
+			ls.add(v);
+			RESULT = ls; :}| 
+
+		PARAMETER:p VARIABLE:v {: ArrayList <String> ls = new ArrayList<>();
+			ls.add(p +" "+ v);
+		  	RESULT = ls; :} | 
+		
+		empty {: RESULT = new ArrayList(); :} ;
+
+
+
+call ::= CALL LPAREN expression: proc COMMA expression: list RPAREN {: RESULT = new ExpListCall(proc, list); :};
+
+
+
+funCall ::= VARIABLE:v LPAREN expListE:el RPAREN {: RESULT = new ExpCall(v, el); :} |
+
+		LPAREN expression:fd RPAREN LPAREN expListE:el RPAREN{: RESULT = new ExpCall(fd, el); :};
+
+
+expListE ::= expL:pl {: RESULT = pl; :} ; 
+
+
+expL ::= expL:ls COMMA expression:e {: ls.add(e);
+		  RESULT = ls;
+		:} |
+
+		expression:e {: ArrayList <Exp> ls = new ArrayList<>();
+			ls.add(e);
+			RESULT = ls; :} |
+
+		empty {: RESULT = new ArrayList(); :};
+
+
+//-----------------------------------------------------------
+
+
+letExp ::= LET LPAREN bindings:bs RPAREN expression:body {:
+			RESULT = new StmtLet(bs, body);
+            :};
+
+binding ::= VARIABLE:v ASSIGN expression:e {:
+		RESULT = new Binding(v, e);
+	    :};
+
+bindings ::= binding:b bindingsAux:bl {:
+		bl.add(0,b);
+		RESULT = bl;
+	     :} |
+		empty {: RESULT = new ArrayList(); :};
+
+bindingsAux ::= COMMA binding:b bindingsAux:bl {:
+		  bl.add(0,b);
+		  RESULT = bl;
+		:} |
+		empty {: RESULT = new ArrayList(); :};
+
+definition ::= VARIABLE:v ASSIGN expression:e SEMI {:
+		   RESULT = new StmtDefinition(v, e);
+		:} | DEF VARIABLE:v expression:e SEMI {:
+		   RESULT = new StmtDefinition(v, e);
+		:};
+
+arithExp ::= 	arithExp:e PLUS term:t {:
+			RESULT = new ExpAdd(e, t); :} |
+		arithExp:e SUBTRACT term:t {:
+			RESULT = new ExpSub(e, t); :} |
+		term:t {: RESULT = t; :};
+
+term ::= term:t MUL power:p {:
+		RESULT = new ExpMul(t, p); :} |
+	 term:t DIV power:p {:
+		RESULT = new ExpDiv(t, p); :} |
+	 term:t MOD power:p {:
+		RESULT = new ExpMod(t, p); :} |
+	 power:p {: RESULT = p; :};
+
+
+power ::= factor:f POW power:p {:
+		RESULT = new ExpPow(f, p); :} |
+	 factor:f {: RESULT = f; :};
+
+
+number ::= INTEGER:ilit {: RESULT = FnPlotValue.make(ilit); :}|
+	   /*MINUS INTEGER:ilit {: RESULT = FnPlotValue.make(-1*ilit); :}|*/
+	   BIN:b {: String bin = b.substring(2, b.length());
+			RESULT = FnPlotValue.make((int) Long.parseLong(bin, 2)); :} |
+	   HEX:h {: String hex = h.substring(2, h.length());
+			RESULT = FnPlotValue.make((int) Long.parseLong(hex, 16)); :} ;
+
+factor ::= number:n {: RESULT = new ExpLit(n); :} |
+	   VARIABLE:var {: RESULT = new ExpVar(var); :} |
+	   funCall:l {: RESULT = l; :} |
+	   size: s {: RESULT = s; :} 	|
+	   MINUS factor:a {: RESULT = new ExpMul(new ExpLit(FnPlotValue.make(-1.0)), a); :}|
+	   LPAREN expression:e RPAREN {: RESULT = e; :}	;
+
+empty ::= ;

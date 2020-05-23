@@ -1,0 +1,237 @@
+package fnplot.syntax;
+
+/* Specification for ArithExp tokens */
+
+// user customisations
+import java_cup.runtime.*;
+
+// Jlex directives
+%%
+    
+%cup
+%public
+
+%class FnPlotLexer
+
+%type java_cup.runtime.Symbol
+
+%eofval{
+	return new Symbol(sym.EOF);
+%eofval}
+
+%eofclose	false
+
+%char
+%line
+
+%{
+    public int getChar() {
+	return yychar + 1;
+    }
+
+    public int getColumn() {
+    	return yycolumn + 1;
+    }
+
+    public int getLine() {
+	return yyline + 1;
+    }
+
+    public String getText() {
+	return yytext();
+    }
+
+    StringBuffer string = new StringBuffer();
+%}
+
+nl = [\n\r]
+
+cc = ([\b\f]|{nl})
+
+ws = {cc}|[\t ]
+
+alpha = [a-zA-Z_]
+
+num = [0-9]
+
+alphanum = {alpha}|{num}
+
+
+// Comments https://jflex.de/manual.html
+
+    LineTerminator = \r|\n|\r\n
+    InputCharacter = [^\r\n]
+    Comment = {TraditionalComment} | {EndOfLineComment} | { DocumentationComment}
+
+    TraditionalComment   = "/*" [^*] ~"*/" | "/*" "*"+ "/"
+    // Comment can be the last line of the file, without line terminator.
+    EndOfLineComment     = "//" {InputCharacter}* {LineTerminator}?
+    DocumentationComment = "/**" {CommentContent} "*"+ "/"
+    CommentContent       = ( [^*] | \*+ [^/*] )*
+  
+    char = [^']
+
+    float = [0-9]+\.?[0-9]* | [0-9]*\.?[0-9]+	 
+	
+    /*with atleast one alpha character*/
+    newid = [a-zA-Z] | ({alphanum}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`") ({alphanum}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`"|"#")* [a-zA-Z]+ ({alphanum}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`"|"#")* | [a-zA-Z][0-9]
+
+
+
+/* Not in use
+    id = {alpha}{alphanum}*
+
+	/*with atleast one non-digit character (affects negative floats)*/
+    newid2 = ({alpha}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`") | ({alphanum}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`") ({alphanum}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`"|"#")*  ({alpha}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`"|"#")+ ({alphanum}|"+"|"-"|"/"|"*"|"!"|"@"|"$"|"%"|"^"|"&"|"="|"|"|"?"|"<"|">"|"."|"~"|"`"|"#")*
+
+*/
+
+
+
+%state STRING
+
+%%
+
+/* comments */
+      {Comment}                      { /* ignore */ }
+
+
+<YYINITIAL>	{nl}	{
+                        //skip newline, but reset char counter
+			yycolumn = 0;
+			}
+<YYINITIAL>	{ws}	{
+                        //skip whitespace
+			}
+<YYINITIAL>	{ws}"+"{ws}	{return new Symbol(sym.PLUS);}
+<YYINITIAL>	{ws}"-"{ws}	{return new Symbol(sym.SUBTRACT);}
+<YYINITIAL>	{ws}"*"{ws}	{return new Symbol(sym.MUL);}
+<YYINITIAL>	{ws}"/"{ws}	{return new Symbol(sym.DIV);}
+<YYINITIAL>	{ws}"%"{ws}	{return new Symbol(sym.MOD);}
+<YYINITIAL>	{ws}"^"{ws}	{return new Symbol(sym.POW);}
+<YYINITIAL>	{ws}"@"{ws}	{return new Symbol(sym.CONCAT);}
+
+<YYINITIAL>	    "-"		{return new Symbol(sym.MINUS);}
+
+<YYINITIAL>	{ws}"="{ws}	{return new Symbol(sym.COMPARISON, "equal");}
+<YYINITIAL>	{ws}"!="{ws}	{return new Symbol(sym.COMPARISON, "not equal");}
+<YYINITIAL>	{ws}"<"{ws}	{return new Symbol(sym.COMPARE, "<");}
+<YYINITIAL>	{ws}">"{ws}	{return new Symbol(sym.COMPARE, ">");}
+<YYINITIAL>	{ws}"<="{ws}	{return new Symbol(sym.COMPARE, "<=");}
+<YYINITIAL>	{ws}">="{ws}	{return new Symbol(sym.COMPARE, ">=");}
+
+
+<YYINITIAL>	{ws}"and"{ws}	{return new Symbol(sym.LOGOP, "and");}
+<YYINITIAL>	{ws}"or"{ws}	{return new Symbol(sym.LOGOP, "or");}
+<YYINITIAL>	"not"		{return new Symbol(sym.LOGOP, "not");}
+
+<YYINITIAL>	":="	{return new Symbol(sym.ASSIGN);}
+
+<YYINITIAL>	"("	{return new Symbol(sym.LPAREN);}
+<YYINITIAL>	")"	{return new Symbol(sym.RPAREN);}
+
+<YYINITIAL>	"{"	{return new Symbol(sym.LBRACE);}
+<YYINITIAL>	"}"	{return new Symbol(sym.RBRACE);}
+
+<YYINITIAL>	","	{return new Symbol(sym.COMMA);}
+
+<YYINITIAL>	"fun"	{return new Symbol(sym.FUN);}
+<YYINITIAL>	"mapsto"	{return new Symbol(sym.MAPS);}
+<YYINITIAL>	"->"	{return new Symbol(sym.MAPS);}	
+
+<YYINITIAL>	"plot"	{return new Symbol(sym.PLOT);}
+<YYINITIAL>	"for"	{return new Symbol(sym.FOR);}
+<YYINITIAL>	"clear"	{return new Symbol(sym.CLEAR);}
+
+<YYINITIAL>	"let"	{return new Symbol(sym.LET);}
+<YYINITIAL>	"in"	{return new Symbol(sym.IN);}
+
+<YYINITIAL>	"["	{return new Symbol(sym.LSQR);}
+<YYINITIAL>	"]"	{return new Symbol(sym.RSQR);}
+<YYINITIAL>	":"	{return new Symbol(sym.COLON);}
+<YYINITIAL>	"[:"	{return new Symbol(sym.LVEC);}
+<YYINITIAL>	":]"	{return new Symbol(sym.RVEC);}
+
+
+<YYINITIAL>	#b[01]{1,32}		{return new Symbol(sym.BIN, yytext());}
+<YYINITIAL>	#x[0-9a-fA-F]{1,8}	{return new Symbol(sym.HEX, yytext());}
+
+<YYINITIAL>	#u[0-9a-fA-F]{4}	{return new Symbol(sym.UNI, yytext());}
+<YYINITIAL>	#c{char}			{return new Symbol(sym.CHAR, yytext());}
+
+<YYINITIAL>	"substr"	{return new Symbol(sym.SUBSTR);}
+
+<YYINITIAL>	"#f"		{return new Symbol(sym.BOOL, new Boolean(false));}
+<YYINITIAL>	"#t"		{return new Symbol(sym.BOOL, new Boolean(true));}
+<YYINITIAL>	"#e"		{return new Symbol(sym.EMPTY);}
+
+<YYINITIAL>	"pair"		{return new Symbol(sym.PAIR);}
+<YYINITIAL>	"pair?"		{return new Symbol(sym.PAIRQ);}
+<YYINITIAL>	"car"		{return new Symbol(sym.CAR);}
+<YYINITIAL>	"cdr"		{return new Symbol(sym.CDR);}
+<YYINITIAL>	"?"		{return new Symbol(sym.QUESTION);}
+<YYINITIAL>	"list"		{return new Symbol(sym.LIST);}
+<YYINITIAL>	"size"		{return new Symbol(sym.SIZE);}
+<YYINITIAL>	"eqv?"		{return new Symbol(sym.EQV);}
+<YYINITIAL>	"equal?"	{return new Symbol(sym.EQUAL);}
+
+<YYINITIAL>	"proc"		{return new Symbol(sym.PROC);}
+<YYINITIAL>	"call"		{return new Symbol(sym.CALL);}
+<YYINITIAL>	"def"		{return new Symbol(sym.DEF);}
+<YYINITIAL>	"if"		{return new Symbol(sym.IF);}
+<YYINITIAL>	"then"		{return new Symbol(sym.THEN);}
+<YYINITIAL>	"else"		{return new Symbol(sym.ELSE);}
+<YYINITIAL>	"case"		{return new Symbol(sym.CASE);}
+<YYINITIAL>	"print"		{return new Symbol(sym.PRINT);}
+<YYINITIAL>	"println"	{return new Symbol(sym.PRINTLN);}
+<YYINITIAL>	"read"		{return new Symbol(sym.READ);}
+<YYINITIAL>	"readint"	{return new Symbol(sym.READINT);}
+
+<YYINITIAL>	"heapify"	{return new Symbol(sym.HEAPIFY);}
+<YYINITIAL>	"getMin"	{return new Symbol(sym.GETMIN);}
+<YYINITIAL>	"deleteMin"	{return new Symbol(sym.DELETEMIN);}
+<YYINITIAL>	"insert"	{return new Symbol(sym.INSERT);}
+
+<YYINITIAL>	"for"		{return new Symbol(sym.FOR);}
+<YYINITIAL>	"repeat"	{return new Symbol(sym.REPEAT);}
+<YYINITIAL>	"until"		{return new Symbol(sym.UNTIL);}
+<YYINITIAL>	"while"		{return new Symbol(sym.WHILE);}
+<YYINITIAL>	"do"		{return new Symbol(sym.DO);}
+<YYINITIAL>	"begin"		{return new Symbol(sym.BEGIN);}
+<YYINITIAL>	"end"		{return new Symbol(sym.END);}
+<YYINITIAL>	"to"		{return new Symbol(sym.TO);}
+<YYINITIAL>	"range"		{return new Symbol(sym.RANGE);}
+
+<YYINITIAL>	"ref"		{return new Symbol(sym.PARAMETER, yytext());}
+
+<YYINITIAL>	";" 		{return new Symbol(sym.SEMI);}
+
+<YYINITIAL>    {num}+ 		{
+	       			// INTEGER
+	       			return new Symbol(sym.INTEGER, new Double(yytext()));
+	       			}
+
+<YYINITIAL>    {float} 		{
+	       			// FLOAT
+	       			return new Symbol(sym.INTEGER, 
+				new Double(yytext()));}
+
+<YYINITIAL>       \"      		{ string.setLength(0); yybegin(STRING); }
+
+<YYINITIAL>    {newid} 			{
+	       				// VARIABLE
+	    				return new Symbol(sym.VARIABLE, yytext());
+	       				}
+
+
+
+
+/* string https://jflex.de/manual.html*/
+<STRING> {
+      \"                             { yybegin(YYINITIAL); return new Symbol(sym.STRING, string.toString()); }
+      [^\n\r\"\\]+                   { string.append( yytext() ); }
+      \\t                            { string.append('\t'); }
+      \\n                            { string.append('\n'); }
+      \\\"                           { string.append('\"'); }
+    }
+
